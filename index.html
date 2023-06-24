@@ -5,7 +5,7 @@
     <meta name="viewport"
           content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Youtube Downloader</title>
+    <title>Video Download</title>
     <style>
         body {
             background-color: #121212;
@@ -112,17 +112,35 @@
             cursor: not-allowed;
             opacity: 0.5;
         }
+
+        button#logs {
+            background-color: #2196f3;
+            display: none;
+        }
+        button#logs[on] {
+            display: inline-block;
+        }
+        .logs {
+            display: none;
+            margin: 20px;
+            padding: 5px;
+            color: white;
+            background: #3a3a3a;
+        }
+        .logs[on] {
+            display: block;
+        }
     </style>
 </head>
 <body>
 <div class="window">
     <label for="url">URL</label>
-    <input type="text" id="url" placeholder="Enter Youtube URL" value="">
+    <input type="text" id="url" placeholder="Enter Video URL" value="">
     <div class="checkbox-wrapper">
         <span class="checkbox-label">Only audio</span>
         <div class="checkbox-custom"></div>
     </div>
-    <label for="quality">Quality</label>
+    <label for="quality">Preferred quality</label>
     <select id="quality">
         <option value="144">144p</option>
         <option value="360">360p</option>
@@ -133,6 +151,9 @@
         <option value="2160">2160p</option>
     </select>
     <button id="download" onclick="requestDownload()">Download</button>
+    <button id="logs" onclick="showLogs()">Display logs</button>
+</div>
+<div class="logs">
 </div>
 <script>
     const checkboxCustom = document.querySelector('.checkbox-custom');
@@ -140,6 +161,8 @@
     const url = document.getElementById('url');
     let audioOnly = checkboxCustom.hasAttribute('checked');
     const quality = document.getElementById('quality');
+    const logsBtn = document.getElementById('logs');
+    const logsDiv = document.querySelector('.logs');
     checkboxCustom.addEventListener('click', function () {
         checkboxCustom.hasAttribute('checked') ? checkboxCustom.removeAttribute('checked') : checkboxCustom.setAttribute('checked', '');
         audioOnly = checkboxCustom.hasAttribute('checked');
@@ -150,33 +173,73 @@
         }
     });
 
+    function showLogs() {
+        logsDiv.setAttribute('on', '');
+        logsBtn.removeAttribute('on');
+    }
+
+    const logs = []
+    const originalPush = Array.prototype.push;
+    logs.push = function(...items) {
+        items.forEach(item => {
+            logsDiv.innerHTML = logsDiv.innerHTML + item + '<br>';
+        });
+        if (logs.length + items.length > 10) {
+            this.splice(0, logs.length + items.length - 10);
+            logsDiv.innerHTML = logsDiv.innerHTML.split('<br>').slice(-10).join('<br>');
+        }
+        return originalPush.call(this, ...items);
+    };
+
+
     function requestDownload() {
         const urlValue = url.value;
         const audioOnlyValue = audioOnly;
         const qualityValue = quality.value;
+        let interval
         if (urlValue && qualityValue) {
             const ws = new WebSocket('ws://192.168.1.197:3000/download');
             ws.onopen = function () {
                 ws.send((audioOnlyValue ? 'audioOnly!' : '') + urlValue + '!' + qualityValue);
                 downloadBtn.disabled = true;
-                downloadBtn.innerText = "Downloading...";
+                downloadBtn.innerText = "Initializing...";
+                logsBtn.setAttribute('on', '');
+                let i = 0;
+                interval = setInterval(function () {
+                    i++;
+                    if (i > 20) {
+                        downloadBtn.innerText = "Please be patient... " + i + "s";
+                    } else {
+                        downloadBtn.innerText = "Initializing... " + i + "s";
+                    }
+                }, 1000);
             };
             ws.onmessage = function (e) {
                 const data = e.data;
                 if (data.startsWith("DONE")) {
                     let actualData = data.substring(5);
                     window.open('http://192.168.1.197:3000/video/' + actualData, '_blank');
+                    if (interval) {
+                        clearInterval(interval);
+                    }
                     downloadBtn.disabled = false;
                     downloadBtn.innerText = "Download";
                 } else if (data.startsWith("ERR")) {
                     alert(data.substring(4));
+                    if (interval) {
+                        clearInterval(interval);
+                    }
                     downloadBtn.innerText = "Download";
                     downloadBtn.disabled = false;
                 } else if (data.startsWith("PROG")) {
+                    if (interval) {
+                        clearInterval(interval);
+                    }
                     let actualData = data.substring(5);
-                    let percent = actualData.split('!')[0];
-                    let video = actualData.split('!')[1] === 'true';
-                    downloadBtn.innerText = "Download " + percent + "% " + (video ? '' : ' (Audio)');
+                    downloadBtn.innerText = "Download " + actualData + "%";
+                } else if (data.startsWith("LOG")) {
+                    let actualData = data.substring(4);
+                    logs.push(actualData);
                 }
             };
         }

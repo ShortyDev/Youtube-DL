@@ -42,69 +42,51 @@ app.ws('/download', function (ws, req) {
             ws.send("ERR Invalid quality");
             return;
         }
-        msg = msg.split("!")[0];
-        const inputMatch = msg.match(regexPattern);
-        const percentMatch = /(\d+(?:\.\d+)?)%/;
-        if (inputMatch && inputMatch[1]) {
-            const videoId = inputMatch[1];
-            fs.mkdir("dl-" + videoId + randomId, {recursive: true}, (err) => {
-                if (err) {
-                    console.error(err);
+        const percentMatch = /(\d{1,3}\.\d{1,2})%/;
+        const videoUrl = msg.split("!")[0];
+        const ytDlp = exec(`yt-dlp -f '${audioOnly ? '' : 'bestvideo[height<=' + quality + ']+'}bestaudio' --merge-output-format mp4 -o "dl-${randomId}/out.mp4" --no-playlist ${videoUrl}`);
+        ytDlp.stdout.on('data', (data) => {
+            if (data.includes("[download]")) {
+                const percent = data.match(percentMatch);
+                if (percent && percent[1]) {
+                    const parsedPercent = parseFloat(percent[1]);
+                    ws.send("PROG:" + parsedPercent);
                 }
-            });
-            const ytDlp = exec(`yt-dlp -f '${audioOnly ? '' : 'bestvideo[height<=' + quality + ']+'}bestaudio' --merge-output-format mp4 -o "dl-${videoId + randomId}/out.mp4" --no-playlist https://www.youtube.com/watch?v=${videoId}`);
-            let videoPercent = true;
-            ytDlp.stdout.on('data', (data) => {
-                if (data.includes("[download]")) {
-                    const percent = data.match(percentMatch);
-                    if (percent && percent[1]) {
-                        const parsedPercent = parseFloat(percent[1]);
-                        if (parsedPercent === 100) {
-                            videoPercent = false;
-                        }
-                        ws.send("PROG:" + percent[1] + "!" + videoPercent);
-                    }
-                }
-            })
-            ytDlp.stderr.on('data', (data) => {
-                if (data.includes("Video unavailable")) {
-                    console.error(`stderr: ${data}`);
-                    ws.send("ERR:Video unavailable");
-                } else {
-                    console.error(`stderr: ${data}`);
-                    ws.send("ERR:Unknown error");
-                }
-                ytDlp.kill();
-                ws.close();
-            })
-            ytDlp.on('close', (code) => {
-                console.log(`child process exited with code ${code}`);
-                ws.send("DONE:" + videoId + "!" + randomId);
-                ws.close();
-            })
-        }
+            }
+            ws.send("LOG:" + data);
+        })
+        ytDlp.stderr.on('data', (data) => {
+            if (data.includes("Video unavailable")) {
+                console.error(`stderr: ${data}`);
+                ws.send("ERR:Video unavailable");
+            } else {
+                console.error(`stderr: ${data}`);
+                ws.send("ERR:Unknown error");
+            }
+            ws.send("LOG:" + data);
+            ytDlp.kill();
+            ws.close();
+        })
+        ytDlp.on('close', (code) => {
+            console.log(`child process exited with code ${code}`);
+            ws.send("DONE:" + randomId);
+            ws.close();
+        })
     });
 })
 
 app.get('/video/:id', (req, res) => {
     const raw = req.params.id;
-    const input = raw.split("!")[0];
-    const randomId = raw.split("!")[1];
-    if (randomId.length > 10) {
+    if (raw.length > 10) {
         res.status(400).send("Invalid input");
         return;
     }
-    const inputMatch = input.match(regexPattern);
-    if (inputMatch && inputMatch[1]) {
-        const videoId = inputMatch[1];
-        if (!fs.existsSync(`dl-${videoId + randomId}/out.mp4`)) {
-            res.status(404).send("File not found");
-            return;
-        }
-        res.sendFile(`dl-${videoId + randomId}/out.mp4`, {root: __dirname});
-    } else {
-        res.status(400).send("Invalid input");
+    const randomId = raw;
+    if (!fs.existsSync(`dl-${randomId}/out.mp4`)) {
+        res.status(404).send("File not found");
+        return;
     }
+    res.sendFile(`dl-${randomId}/out.mp4`, {root: __dirname});
 })
 
 app.get('/', (req, res) => {
