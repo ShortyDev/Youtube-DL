@@ -44,6 +44,7 @@ app.ws('/download', function (ws, req) {
         }
         const percentMatch = /(\d{1,3}\.\d{1,2})%/;
         const videoUrl = msg.split("!")[0];
+        console.log("Downloading " + videoUrl + " to " + randomId + " with quality " + quality + " and audioOnly " + audioOnly);
         const ytDlp = exec(`yt-dlp -f '${audioOnly ? '' : 'bestvideo[height<=' + quality + ']+'}bestaudio' --merge-output-format mp4 -o "dl-${randomId}/out.mp4" --no-playlist ${videoUrl}`);
         ytDlp.stdout.on('data', (data) => {
             if (data.includes("[download]")) {
