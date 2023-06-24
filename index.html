@@ -167,6 +167,7 @@
                     let actualData = data.substring(5);
                     window.open('http://192.168.1.197:3000/video/' + actualData, '_blank');
                     downloadBtn.disabled = false;
+                    downloadBtn.innerText = "Download";
                 } else if (data.startsWith("ERR")) {
                     alert(data.substring(4));
                     downloadBtn.innerText = "Download";
