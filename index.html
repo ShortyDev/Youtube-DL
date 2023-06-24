@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Youtube Downloader</title>
+    <style>
+        body {
+            background-color: #121212;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        .window {
+            background-color: #262626;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+            max-width: 400px;
+            width: 100%;
+        }
+
+        label {
+            color: #ffffff;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        input[type="text"], input[type="checkbox"], select {
+            width: 100%;
+            padding: 5px;
+            border-radius: 5px;
+            border: none;
+            background-color: #3d3d3d;
+            color: #ffffff;
+            margin-bottom: 15px;
+        }
+
+        select {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+        }
+
+        /* Checkbox Style */
+        .checkbox-wrapper {
+            display: inline-flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .checkbox-label {
+            user-select: none;
+            color: #ffffff;
+            margin-right: 10px;
+        }
+
+        .checkbox-custom {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            background-color: #3d3d3d;
+            position: relative;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .checkbox-custom[checked]::before {
+            content: "\2713";
+            font-size: 10px;
+            color: #ffffff;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .checkbox-custom[checked] {
+            background-color: #4caf50;
+        }
+
+        .checkbox-custom:focus {
+            box-shadow: 0 0 0 2px #4caf50;
+        }
+
+        button {
+            background-color: #4caf50;
+            color: #ffffff;
+            border: none;
+            border-radius: 5px;
+            padding: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+<div class="window">
+    <label for="url">URL</label>
+    <input type="text" id="url" placeholder="Enter Youtube URL" value="">
+    <div class="checkbox-wrapper">
+        <span class="checkbox-label">Only audio</span>
+        <div class="checkbox-custom"></div>
+    </div>
+    <label for="quality">Quality</label>
+    <select id="quality">
+        <option value="144">144p</option>
+        <option value="360">360p</option>
+        <option value="480">480p</option>
+        <option value="720">720p</option>
+        <option value="1080" selected="selected">1080p</option>
+        <option value="1440">1440p</option>
+        <option value="2160">2160p</option>
+    </select>
+    <button id="download" onclick="requestDownload()">Download</button>
+</div>
+<script>
+    const checkboxCustom = document.querySelector('.checkbox-custom');
+    const downloadBtn = document.getElementById('download');
+    const url = document.getElementById('url');
+    let audioOnly = checkboxCustom.hasAttribute('checked');
+    const quality = document.getElementById('quality');
+    checkboxCustom.addEventListener('click', function () {
+        checkboxCustom.hasAttribute('checked') ? checkboxCustom.removeAttribute('checked') : checkboxCustom.setAttribute('checked', '');
+        audioOnly = checkboxCustom.hasAttribute('checked');
+        if (audioOnly) {
+            quality.style.display = 'none';
+        } else {
+            quality.style.display = 'block';
+        }
+    });
+
+    function requestDownload() {
+        const urlValue = url.value;
+        const audioOnlyValue = audioOnly;
+        const qualityValue = quality.value;
+        if (urlValue && qualityValue) {
+            const ws = new WebSocket('ws://192.168.1.197:3000/download');
+            ws.onopen = function () {
+                ws.send((audioOnlyValue ? 'audioOnly!' : '') + urlValue + '!' + qualityValue);
+                downloadBtn.disabled = true;
+                downloadBtn.innerText = "Downloading...";
+            };
+            ws.onmessage = function (e) {
+                const data = e.data;
+                if (data.startsWith("DONE")) {
+                    let actualData = data.substring(5);
+                    window.open('http://192.168.1.197:3000/video/' + actualData, '_blank');
+                    downloadBtn.disabled = false;
+                } else if (data.startsWith("ERR")) {
+                    alert(data.substring(4));
+                    downloadBtn.innerText = "Download";
+                    downloadBtn.disabled = false;
+                } else if (data.startsWith("PROG")) {
+                    let actualData = data.substring(5);
+                    let percent = actualData.split('!')[0];
+                    let video = actualData.split('!')[1] === 'true';
+                    downloadBtn.innerText = "Download " + percent + "% " + (video ? '' : ' (Audio)');
+                }
+            };
+        }
+    }
+</script>
+</body>
+</html>
