@@ -44,8 +44,19 @@ app.ws('/download', function (ws, req) {
         }
         const percentMatch = /(\d{1,3}\.\d{1,2})%/;
         const videoUrl = msg.split("!")[0];
+        if (videoUrl.includes(" ") || videoUrl.includes("\"") || videoUrl.includes("'")) {
+            ws.send("ERR:Invalid URL");
+            return;
+        }
         console.log("Downloading " + videoUrl + " to " + randomId + " with quality " + quality + " and audioOnly " + audioOnly);
         const ytDlp = exec(`yt-dlp -f '${audioOnly ? '' : 'bestvideo[height<=' + quality + ']+'}bestaudio' --merge-output-format mp4 -o "dl-${randomId}/out.mp4" --no-playlist ${videoUrl}`);
+        setTimeout(() => {
+            if (!fs.existsSync(`dl-${randomId}/out.mp4`)) {
+                ws.send("ERR:Timeout");
+                ytDlp.kill();
+                ws.close();
+            }
+        }, 60 * 1000);
         ytDlp.stdout.on('data', (data) => {
             if (data.includes("[download]")) {
                 const percent = data.match(percentMatch);

@@ -117,9 +117,11 @@
             background-color: #2196f3;
             display: none;
         }
+
         button#logs[on] {
             display: inline-block;
         }
+
         .logs {
             display: none;
             margin: 20px;
@@ -127,6 +129,7 @@
             color: white;
             background: #3a3a3a;
         }
+
         .logs[on] {
             display: block;
         }
@@ -181,7 +184,7 @@
 
     const logs = []
     const originalPush = Array.prototype.push;
-    logs.push = function(...items) {
+    logs.push = function (...items) {
         items.forEach(item => {
             logsDiv.innerHTML = logsDiv.innerHTML + item + '<br>';
         });
@@ -199,7 +202,9 @@
         const qualityValue = quality.value;
         let interval
         if (urlValue && qualityValue) {
-            const ws = new WebSocket('ws://192.168.1.197:3000/download');
+            const currentDomainAndSubdomain = window.location.hostname + (window.location.port ? ':' + window.location.port : '');
+            const isHttps = window.location.protocol === "https:";
+            const ws = new WebSocket((isHttps ? 'wss' : "ws") + '://' + currentDomainAndSubdomain + '/download');
             ws.onopen = function () {
                 ws.send((audioOnlyValue ? 'audioOnly!' : '') + urlValue + '!' + qualityValue);
                 downloadBtn.disabled = true;
@@ -219,12 +224,15 @@
                 const data = e.data;
                 if (data.startsWith("DONE")) {
                     let actualData = data.substring(5);
-                    window.open('http://192.168.1.197:3000/video/' + actualData, '_blank');
+                    window.open((isHttps ? 'https' : 'http') + '://' + currentDomainAndSubdomain + '/video/' + actualData, '_blank');
                     if (interval) {
                         clearInterval(interval);
                     }
                     downloadBtn.disabled = false;
                     downloadBtn.innerText = "Download";
+                    logsDiv.innerHTML = '';
+                    logsDiv.removeAttribute('on');
+                    logsBtn.removeAttribute('on');
                 } else if (data.startsWith("ERR")) {
                     alert(data.substring(4));
                     if (interval) {
@@ -232,6 +240,9 @@
                     }
                     downloadBtn.innerText = "Download";
                     downloadBtn.disabled = false;
+                    logsDiv.innerHTML = '';
+                    logsDiv.removeAttribute('on');
+                    logsBtn.removeAttribute('on');
                 } else if (data.startsWith("PROG")) {
                     if (interval) {
                         clearInterval(interval);
