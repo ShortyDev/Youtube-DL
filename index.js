@@ -47,7 +47,7 @@ app.ws('/download', function (ws, req) {
         const percentMatch = /(\d+(?:\.\d+)?)%/;
         if (inputMatch && inputMatch[1]) {
             const videoId = inputMatch[1];
-            fs.mkdir("dl-" + videoId, {recursive: true}, (err) => {
+            fs.mkdir("dl-" + videoId + randomId, {recursive: true}, (err) => {
                 if (err) {
                     console.error(err);
                 }
