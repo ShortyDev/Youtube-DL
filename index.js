@@ -56,7 +56,7 @@ app.ws('/download', function (ws, req) {
                 ytDlp.kill();
                 ws.close();
             }
-        }, 60 * 1000);
+        }, 5 * 60 * 1000);
         ytDlp.stdout.on('data', (data) => {
             if (data.includes("[download]")) {
                 const percent = data.match(percentMatch);
