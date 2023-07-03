@@ -48,6 +48,19 @@ app.ws('/download', function (ws, req) {
             ws.send("ERR:Invalid URL");
             return;
         }
+        let timing;
+        let startTimeSec
+        let endTimeSec
+        if (msg.split("!").length === 3) {
+            timing = msg.split("!")[2]
+            if (timing.split(":").length !== 2) {
+                ws.send("ERR:Invalid timing")
+                ws.close()
+                return;
+            }
+            startTimeSec = timing.split(":")[0]
+            endTimeSec = timing.split(":")[1]
+        }
         console.log("Downloading " + videoUrl + " to " + randomId + " with quality " + quality + " and audioOnly " + audioOnly);
         const ytDlp = exec(`yt-dlp -f '${audioOnly ? '' : 'bestvideo[height<=' + quality + ']+'}bestaudio' --merge-output-format mp4 -o "dl-${randomId}/out.mp4" --no-playlist ${videoUrl}`);
         setTimeout(() => {
@@ -80,7 +93,20 @@ app.ws('/download', function (ws, req) {
             ws.close();
         })
         ytDlp.on('close', (code) => {
-            console.log(`child process exited with code ${code}`);
+            console.log(`[YT-DLP] child process exited with code ${code}`);
+            if (timing) {
+                const ffmpegCut = exec(`ffmpeg -y -i dl-${randomId}/out.mp4 -ss ${startTimeSec} -to ${endTimeSec} -c:v copy -c:a copy dl-${randomId}/out2.mp4`)
+                ffmpegCut.stdout.on('data', (data) => {
+                    ws.send("LOG:" + data)
+                    console.log("ffmpeg post: " + data)
+                })
+                ffmpegCut.on('close', (code) => {
+                    console.log(`[FFMPEG-POST] child process exited with code ${code}`);
+                    ws.send("DONE:" + randomId);
+                    ws.close();
+                })
+                return
+            }
             ws.send("DONE:" + randomId);
             ws.close();
         })
@@ -94,11 +120,12 @@ app.get('/video/:id', (req, res) => {
         return;
     }
     const randomId = raw;
+    const output2 = fs.existsSync(`dl-${randomId}/out2.mp4`)
     if (!fs.existsSync(`dl-${randomId}/out.mp4`)) {
         res.status(404).send("File not found");
         return;
     }
-    res.sendFile(`dl-${randomId}/out.mp4`, {root: __dirname});
+    res.sendFile(`dl-${randomId}/${output2 ? "out2.mp4" : "out.mp4"}`, {root: __dirname});
 })
 
 app.get('/', (req, res) => {

@@ -133,6 +133,18 @@
         .logs[on] {
             display: block;
         }
+        span.timing {
+            color: white;
+        }
+        div.timing {
+            margin-top: 10px;
+        }
+        .timing input {
+            width: 10%;
+        }
+        .timing label {
+            display: inline-block;
+        }
     </style>
 </head>
 <body>
@@ -154,6 +166,13 @@
         <option value="2160">2160p</option>
         <option value="4320">4320p</option>
     </select>
+    <span class="timing">Cut video/audio (optional)</span>
+    <div class="timing">
+        <label for="time_start">Start</label>
+        <input id="time_start" type="text" placeholder="0:00">
+        <label for="time_end">End</label>
+        <input id="time_end" type="text" placeholder="0:30">
+    </div>
     <button id="download" onclick="requestDownload()">Download</button>
     <button id="logs" onclick="showLogs()">Display logs</button>
 </div>
@@ -167,6 +186,8 @@
     const quality = document.getElementById('quality');
     const logsBtn = document.getElementById('logs');
     const logsDiv = document.querySelector('.logs');
+    const timeStart = document.getElementById('time_start');
+    const timeEnd = document.getElementById('time_end');
     checkboxCustom.addEventListener('click', function () {
         checkboxCustom.hasAttribute('checked') ? checkboxCustom.removeAttribute('checked') : checkboxCustom.setAttribute('checked', '');
         audioOnly = checkboxCustom.hasAttribute('checked');
@@ -195,6 +216,26 @@
         return originalPush.call(this, ...items);
     };
 
+    function convertTimeToSeconds(time) {
+      const timeComponents = time.split(':');
+      let hours = 0;
+      let minutes = 0;
+      let seconds = 0;
+
+      if (timeComponents.length === 3) {
+        hours = parseInt(timeComponents[0]);
+        minutes = parseInt(timeComponents[1]);
+        seconds = parseInt(timeComponents[2]);
+      } else if (timeComponents.length === 2) {
+        minutes = parseInt(timeComponents[0]);
+        seconds = parseInt(timeComponents[1]);
+      } else {
+        return NaN; // Invalid time format
+      }
+
+      const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
+      return totalSeconds;
+    }
 
     function requestDownload() {
         const urlValue = url.value;
@@ -206,7 +247,9 @@
             const isHttps = window.location.protocol === "https:";
             const ws = new WebSocket((isHttps ? 'wss' : "ws") + '://' + currentDomainAndSubdomain + '/download');
             ws.onopen = function () {
-                ws.send((audioOnlyValue ? 'audioOnly!' : '') + urlValue + '!' + qualityValue);
+                let startTime = convertTimeToSeconds(timeStart.value)
+                let endTime = convertTimeToSeconds(timeEnd.value)
+                ws.send((audioOnlyValue ? 'audioOnly!' : '') + urlValue + '!' + qualityValue + ((!isNaN(startTime) && !isNaN(endTime)) ? "!" + startTime + ":" + endTime : ""));
                 downloadBtn.disabled = true;
                 downloadBtn.innerText = "Initializing...";
                 logsBtn.setAttribute('on', '');
